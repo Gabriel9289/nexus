@@ -1,0 +1,429 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nexus — Tweet</title>
+  <link rel="stylesheet" href="static/css/main.css"/>
+  <style>
+    .tweet-detail {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tweet-detail-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .tweet-detail-name {
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .tweet-detail-name:hover { color: var(--blue); }
+
+    .tweet-detail-handle {
+      font-size: 15px;
+      color: var(--text-muted);
+    }
+
+    .tweet-detail-body {
+      font-size: 23px;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+      margin-bottom: 16px;
+    }
+
+    .tweet-detail-time {
+      font-size: 15px;
+      color: var(--text-muted);
+      padding: 16px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    .tweet-detail-stats {
+      display: flex;
+      gap: 24px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-item { font-size: 15px; }
+    .stat-item strong { font-weight: 800; }
+    .stat-item span { color: var(--text-muted); }
+
+    .tweet-detail-actions {
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail-action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--text-muted);
+      transition: all var(--transition);
+    }
+
+    .detail-action-btn:hover.reply-btn  { background: rgba(29,155,240,0.1);  color: var(--blue); }
+    .detail-action-btn:hover.rt-btn     { background: rgba(0,186,124,0.1);   color: var(--green); }
+    .detail-action-btn:hover.like-btn   { background: rgba(244,33,46,0.1);   color: var(--red); }
+    .detail-action-btn:hover.bm-btn     { background: rgba(29,155,240,0.1);  color: var(--blue); }
+    .detail-action-btn.liked            { color: var(--red); }
+    .detail-action-btn.retweeted        { color: var(--green); }
+    .detail-action-btn.bookmarked       { color: var(--blue); }
+
+    .reply-compose {
+      display: flex;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .reply-compose textarea {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 17px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      min-height: 60px;
+      line-height: 1.5;
+    }
+
+    .reply-compose textarea::placeholder { color: var(--text-muted); }
+
+    .reply-compose-footer {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 8px;
+    }
+
+    .replies-header {
+      padding: 16px 20px;
+      font-size: 18px;
+      font-weight: 800;
+      border-bottom: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Left Sidebar -->
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <!-- Main -->
+  <main class="main-feed">
+    <div class="feed-header">
+      <button onclick="history.back()"
+              style="background:none;border:none;color:var(--text);
+                     font-size:20px;cursor:pointer;margin-right:20px">←</button>
+      <span>Post</span>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">☀️</button>
+    </div>
+
+    <div id="tweetLoader" class="loader"><div class="spinner"></div></div>
+
+    <!-- Tweet detail -->
+    <div id="tweetDetail" style="display:none">
+      <div class="tweet-detail">
+        <div class="tweet-detail-header">
+          <div id="detailAvatar"></div>
+          <div>
+            <div class="tweet-detail-name" id="detailName"></div>
+            <div class="tweet-detail-handle" id="detailHandle"></div>
+          </div>
+          <div id="detailDeleteBtn" style="margin-left:auto;display:none">
+            <button style="background:none;border:none;color:var(--red);
+                           cursor:pointer;font-size:14px;font-weight:700"
+                    onclick="doDeleteTweet()">Delete</button>
+          </div>
+        </div>
+
+        <div class="tweet-detail-body" id="detailBody"></div>
+
+        <div class="tweet-detail-time" id="detailTime"></div>
+
+        <div class="tweet-detail-stats">
+          <div class="stat-item">
+            <strong id="statRetweets">0</strong>
+            <span> Reposts</span>
+          </div>
+          <div class="stat-item">
+            <strong id="statLikes">0</strong>
+            <span> Likes</span>
+          </div>
+          <div class="stat-item">
+            <strong id="statReplies">0</strong>
+            <span> Replies</span>
+          </div>
+          <div class="stat-item">
+            <strong id="statBookmarks">0</strong>
+            <span> Bookmarks</span>
+          </div>
+        </div>
+
+        <div class="tweet-detail-actions">
+          <button class="detail-action-btn reply-btn" title="Reply"
+                  onclick="focusReply()">💬</button>
+          <button class="detail-action-btn rt-btn" id="detailRtBtn"
+                  title="Repost" onclick="doDetailRetweet()">🔁</button>
+          <button class="detail-action-btn like-btn" id="detailLikeBtn"
+                  title="Like" onclick="doDetailLike()">🤍</button>
+          <button class="detail-action-btn bm-btn" id="detailBmBtn"
+                  title="Bookmark" onclick="doDetailBookmark()">📎</button>
+        </div>
+      </div>
+
+      <!-- Reply compose -->
+      <div class="reply-compose" id="replyCompose" style="display:none">
+        <div id="replyAvatar"></div>
+        <div style="flex:1">
+          <textarea id="replyInput"
+                    placeholder="Post your reply..."
+                    onkeydown="if(event.key==='Enter'&&event.ctrlKey) submitReply()">
+          </textarea>
+          <div class="reply-compose-footer">
+            <span style="font-size:13px;color:var(--text-muted);margin-right:12px">
+              Ctrl+Enter to post
+            </span>
+            <button class="btn btn-blue" onclick="submitReply()">Reply</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Replies -->
+      <div class="replies-header" id="repliesHeader">Replies</div>
+      <div id="repliesList"></div>
+      <div id="repliesEmpty" class="empty" style="display:none">
+        <div class="empty-icon">💬</div>
+        <p>No replies yet. Be the first!</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right Sidebar -->
+  <aside class="right-sidebar">
+    <div class="search-bar">
+      <span>🔍</span>
+      <input type="text" placeholder="Search Nexus"
+             onkeydown="if(event.key==='Enter') window.location.href=
+               'index.html?q='+encodeURIComponent(this.value)"/>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="static/js/api.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.href = "login.html";
+
+  initTheme();
+
+  const params  = new URLSearchParams(window.location.search);
+  const tweetId = params.get("id");
+  const user    = getUser();
+  let tweet     = null;
+
+  if (!tweetId) window.location.href = "index.html";
+
+  // --- Sidebar ----====-
+  document.getElementById("sidebar").innerHTML = `
+    <div class="sidebar-logo">𝕏 <span>Nexus</span></div>
+    <button class="nav-item" onclick="window.location.href='index.html'">
+      🏠 <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-item" onclick="window.location.href='index.html'">
+      🔍 <span class="nav-label">Explore</span>
+    </button>
+    <button class="nav-item"
+            onclick="window.location.href='profile.html?u=${user.username}'">
+      👤 <span class="nav-label">Profile</span>
+    </button>
+    <button class="tweet-btn" onclick="window.location.href='index.html'">
+      <span>Post</span>
+    </button>
+    <div class="sidebar-user">
+      <div class="avatar" style="width:40px;height:40px">
+        ${(user.display_name || user.username)[0].toUpperCase()}
+      </div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name">${user.display_name || user.username}</div>
+        <div class="sidebar-user-handle">@${user.username}</div>
+      </div>
+    </div>`;
+
+  // --- Load tweet ---------------------
+  async function loadTweet() {
+    const [status, data] = await apiGetTweet(tweetId);
+
+    if (status !== 200) {
+      showToast("Tweet not found.", "error");
+      setTimeout(() => window.location.href = "index.html", 1500);
+      return;
+    }
+
+    tweet = data;
+    document.title = `${tweet.author.display_name || tweet.author.username} on Nexus`;
+
+    // Avatar + name
+    document.getElementById("detailAvatar").innerHTML =
+      avatarHTML(tweet.author, 48);
+
+    document.getElementById("detailName").textContent =
+      tweet.author.display_name || tweet.author.username;
+    document.getElementById("detailName").onclick = () =>
+      window.location.href = `profile.html?u=${tweet.author.username}`;
+
+    document.getElementById("detailHandle").textContent =
+      `@${tweet.author.username}`;
+
+    // Body with hashtag highlighting
+    document.getElementById("detailBody").innerHTML =
+      highlightHashtags(tweet.body);
+
+    // Time — full format
+    document.getElementById("detailTime").textContent =
+      new Date(tweet.created_at).toLocaleString("en-ZA", {
+        hour: "numeric", minute: "2-digit",
+        day: "numeric", month: "long", year: "numeric"
+      });
+
+    // Stats
+    document.getElementById("statRetweets").textContent = tweet.retweet_count;
+    document.getElementById("statLikes").textContent    = tweet.like_count;
+    document.getElementById("statReplies").textContent  = tweet.reply_count;
+    document.getElementById("statBookmarks").textContent = 0;
+
+    // Action button states
+    if (tweet.liked) {
+      document.getElementById("detailLikeBtn").classList.add("liked");
+      document.getElementById("detailLikeBtn").textContent = "❤️";
+    }
+    if (tweet.retweeted) {
+      document.getElementById("detailRtBtn").classList.add("retweeted");
+    }
+    if (tweet.bookmarked) {
+      document.getElementById("detailBmBtn").classList.add("bookmarked");
+      document.getElementById("detailBmBtn").textContent = "🔖";
+    }
+
+    // Delete button — only show if own tweet
+    if (user.id === tweet.author.id) {
+      document.getElementById("detailDeleteBtn").style.display = "block";
+    }
+
+    // Reply compose — show if logged in
+    document.getElementById("replyCompose").style.display = "flex";
+    document.getElementById("replyAvatar").innerHTML =
+      avatarHTML(user, 42);
+
+    document.getElementById("tweetLoader").style.display  = "none";
+    document.getElementById("tweetDetail").style.display  = "block";
+
+    loadReplies();
+  }
+
+  // --- Replies ----====--
+  async function loadReplies() {
+    const [, replies] = await apiGetReplies(tweetId);
+
+    document.getElementById("repliesHeader").textContent =
+      `${replies.length} Repl${replies.length !== 1 ? "ies" : "y"}`;
+
+    if (!replies.length) {
+      document.getElementById("repliesEmpty").style.display = "block";
+      return;
+    }
+
+    document.getElementById("repliesList").innerHTML =
+      replies.map(r => tweetCardHTML(r)).join("");
+  }
+
+  async function submitReply() {
+    const body = document.getElementById("replyInput").value.trim();
+    if (!body) return;
+
+    const [status, data] = await apiPostTweet(body, parseInt(tweetId));
+    if (status === 201) {
+      document.getElementById("replyInput").value = "";
+      document.getElementById("repliesEmpty").style.display = "none";
+      document.getElementById("repliesList")
+        .insertAdjacentHTML("afterbegin", tweetCardHTML(data));
+
+      // Update reply count
+      const count = parseInt(document.getElementById("statReplies").textContent) + 1;
+      document.getElementById("statReplies").textContent = count;
+      showToast("Reply posted!");
+    } else {
+      showToast(data.detail || "Failed.", "error");
+    }
+  }
+
+  function focusReply() {
+    document.getElementById("replyInput").focus();
+    document.getElementById("replyCompose").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // --- Actions ----====--
+  async function doDetailLike() {
+    if (!isLoggedIn()) { window.location.href = "login.html"; return; }
+    const [, data] = await apiLike(tweetId);
+    const btn = document.getElementById("detailLikeBtn");
+    btn.classList.toggle("liked", data.liked);
+    btn.textContent = data.liked ? "❤️" : "🤍";
+    document.getElementById("statLikes").textContent = data.like_count;
+  }
+
+  async function doDetailRetweet() {
+    if (!isLoggedIn()) { window.location.href = "login.html"; return; }
+    const [status, data] = await apiRetweet(tweetId);
+    if (status === 400) { showToast(data.detail, "error"); return; }
+    const btn = document.getElementById("detailRtBtn");
+    btn.classList.toggle("retweeted", data.retweeted);
+    document.getElementById("statRetweets").textContent = data.retweet_count;
+    showToast(data.retweeted ? "Reposted!" : "Undo repost");
+  }
+
+  async function doDetailBookmark() {
+    if (!isLoggedIn()) { window.location.href = "login.html"; return; }
+    const [, data] = await apiBookmark(tweetId);
+    const btn = document.getElementById("detailBmBtn");
+    btn.classList.toggle("bookmarked", data.bookmarked);
+    btn.textContent = data.bookmarked ? "🔖" : "📎";
+    showToast(data.bookmarked ? "Saved to bookmarks" : "Removed from bookmarks");
+  }
+
+  async function doDeleteTweet() {
+    if (!confirm("Delete this tweet?")) return;
+    const status = await apiDeleteTweet(tweetId);
+    if (status === 204) {
+      showToast("Tweet deleted.");
+      setTimeout(() => history.back(), 1000);
+    }
+  }
+
+  loadTweet();
+</script>
+</body>
+</html>

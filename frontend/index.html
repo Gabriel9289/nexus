@@ -1,0 +1,337 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nexus — Home</title>
+  <link rel="stylesheet" href="static/css/main.css"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Left Sidebar -->
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <!-- Main Feed -->
+  <main class="main-feed">
+    <div class="feed-header">
+      <span id="feedTitle">Home</span>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">☀️</button>
+    </div>
+
+    <div class="feed-tabs">
+      <button class="feed-tab active" id="tabFor"  onclick="switchTab('for',  this)">For you</button>
+      <button class="feed-tab"        id="tabFollow" onclick="switchTab('follow', this)">Following</button>
+    </div>
+
+    <!-- Compose -->
+    <div class="compose" id="composeBox" style="display:none">
+      <div id="composeAvatar"></div>
+      <div class="compose-right">
+        <textarea id="tweetInput" placeholder="What is happening?!"
+                  oninput="updateCharCount()" maxlength="280"></textarea>
+        <div class="compose-footer">
+          <span class="char-count" id="charCount">280</span>
+          <button class="btn btn-blue" onclick="submitTweet()">Post</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="feedLoader" class="loader"><div class="spinner"></div></div>
+    <div id="feedList"></div>
+    <div id="feedEmpty" class="empty" style="display:none">
+      <div class="empty-icon">✨</div>
+      <h3>Nothing here yet</h3>
+      <p>Follow some people to see their tweets.</p>
+    </div>
+  </main>
+
+  <!-- Right Sidebar -->
+  <aside class="right-sidebar">
+    <div class="search-bar">
+      <span>🔍</span>
+      <input id="searchInput" type="text" placeholder="Search Nexus"
+             onkeydown="if(event.key==='Enter') doSearch()"/>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-panel-title">Trends for you</div>
+      <div id="trendsList"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-panel-title">Who to follow</div>
+      <div id="suggestionsList"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="static/js/api.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.href = "login.html";
+
+  initTheme();
+
+  const user   = getUser();
+  const params = new URLSearchParams(window.location.search);
+  const query  = params.get("q");
+
+  // --- Sidebar ----====-
+  function renderSidebar(unread = 0) {
+    document.getElementById("sidebar").innerHTML = `
+      <div class="sidebar-logo">𝕏 <span>Nexus</span></div>
+      <button class="nav-item active" onclick="window.location.href='index.html'">
+        🏠 <span class="nav-label">Home</span>
+      </button>
+      <button class="nav-item" onclick="doSearch()">
+        🔍 <span class="nav-label">Explore</span>
+      </button>
+      <button class="nav-item" onclick="window.location.href='index.html?tab=notifications'">
+        🔔 <span class="nav-label">Notifications</span>
+        ${unread > 0 ? `<span class="nav-badge">${unread}</span>` : ""}
+      </button>
+      <button class="nav-item" onclick="window.location.href='index.html?tab=bookmarks'">
+        🔖 <span class="nav-label">Bookmarks</span>
+      </button>
+      <button class="nav-item"
+              onclick="window.location.href='profile.html?u=${user.username}'">
+        👤 <span class="nav-label">Profile</span>
+      </button>
+      <button class="tweet-btn" onclick="focusTweet()">
+        <span>Post</span>
+      </button>
+      <div class="sidebar-user" onclick="window.location.href='profile.html?u=${user.username}'">
+        <div class="avatar" style="width:40px;height:40px">
+          ${(user.display_name || user.username)[0].toUpperCase()}
+        </div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">${user.display_name || user.username}</div>
+          <div class="sidebar-user-handle">@${user.username}</div>
+        </div>
+        <button onclick="event.stopPropagation();logout()"
+                style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px">
+          ···
+        </button>
+      </div>`;
+  }
+
+  // --- Feed ----====-----
+  let currentTab = "for";
+
+  async function switchTab(tab, el) {
+    currentTab = tab;
+    document.querySelectorAll(".feed-tab").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    loadFeed();
+  }
+
+  async function loadFeed() {
+    document.getElementById("feedLoader").style.display = "flex";
+    document.getElementById("feedList").innerHTML       = "";
+    document.getElementById("feedEmpty").style.display  = "none";
+
+    let tweets = [];
+
+    if (query) {
+      document.getElementById("feedTitle").textContent = `Search: ${decodeURIComponent(query)}`;
+      const [, data] = await apiSearch(decodeURIComponent(query));
+      tweets = Array.isArray(data) ? data : [];
+    } else if (params.get("tab") === "notifications") {
+      loadNotifications();
+      return;
+    } else if (params.get("tab") === "bookmarks") {
+      loadBookmarks();
+      return;
+    } else if (currentTab === "follow") {
+      const [, data] = await apiGetFeed();
+      tweets = Array.isArray(data) ? data : [];
+    } else {
+      const [, data] = await apiExplore();
+      tweets = Array.isArray(data) ? data : [];
+    }
+
+    renderFeed(tweets);
+  }
+
+  function renderFeed(tweets) {
+    document.getElementById("feedLoader").style.display = "none";
+    if (!tweets.length) {
+      document.getElementById("feedEmpty").style.display = "block";
+      return;
+    }
+    document.getElementById("feedList").innerHTML = tweets.map(tweetCardHTML).join("");
+  }
+
+  // --- Notifications tab --------------
+  async function loadNotifications() {
+    document.getElementById("feedTitle").textContent    = "Notifications";
+    document.getElementById("feedLoader").style.display = "none";
+    await apiMarkAllRead();
+
+    const [, notifs] = await apiGetNotifications();
+    if (!notifs.length) {
+      document.getElementById("feedEmpty").style.display = "block";
+      document.querySelector(".empty h3").textContent    = "No notifications yet";
+      document.querySelector(".empty p").textContent     = "When someone likes or follows you, it shows here.";
+      return;
+    }
+
+    const icons = { like: "❤️", retweet: "🔁", follow: "👤", reply: "💬" };
+    document.getElementById("feedList").innerHTML = notifs.map(n => `
+      <div style="display:flex;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);
+                  ${!n.is_read ? "background:var(--bg-2)" : ""}">
+        <span style="font-size:24px">${icons[n.kind] || "🔔"}</span>
+        <div>
+          <strong>${n.actor?.display_name || n.actor?.username || "Someone"}</strong>
+          ${n.kind === "like"    ? "liked your tweet"    : ""}
+          ${n.kind === "retweet" ? "retweeted your tweet" : ""}
+          ${n.kind === "follow"  ? "followed you"        : ""}
+          ${n.kind === "reply"   ? "replied to your tweet" : ""}
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">
+            ${timeAgo(n.created_at)}
+          </div>
+        </div>
+      </div>`).join("");
+
+    renderSidebar(0);
+  }
+
+  // --- Bookmarks tab ------------------
+  async function loadBookmarks() {
+    document.getElementById("feedTitle").textContent    = "Bookmarks";
+    document.getElementById("feedLoader").style.display = "none";
+    const [, data] = await apiMyBookmarks();
+    renderFeed(Array.isArray(data) ? data : []);
+  }
+
+  // --- Compose ----====--
+  function focusTweet() {
+    document.getElementById("tweetInput")?.focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function updateCharCount() {
+    const len = document.getElementById("tweetInput").value.length;
+    const el  = document.getElementById("charCount");
+    const rem = 280 - len;
+    el.textContent = rem;
+    el.className   = `char-count ${rem <= 20 ? "danger" : rem <= 50 ? "warning" : ""}`;
+  }
+
+  async function submitTweet() {
+    const body = document.getElementById("tweetInput").value.trim();
+    if (!body) return;
+
+    const [status, data] = await apiPostTweet(body);
+    if (status === 201) {
+      document.getElementById("tweetInput").value = "";
+      document.getElementById("charCount").textContent = "280";
+      document.getElementById("feedList").insertAdjacentHTML("afterbegin", tweetCardHTML(data));
+      document.getElementById("feedEmpty").style.display = "none";
+      showToast("Posted!");
+    } else {
+      showToast(data.detail || "Failed to post.", "error");
+    }
+  }
+
+  // --- Search ----====---
+  function doSearch() {
+    const q = document.getElementById("searchInput")?.value?.trim();
+    if (q) window.location.href = `index.html?q=${encodeURIComponent(q)}`;
+  }
+
+  // --- Trends ----====---
+  async function loadTrends() {
+    const [, data] = await apiTrending();
+    const el = document.getElementById("trendsList");
+    if (!Array.isArray(data) || !data.length) {
+      el.innerHTML = `<p style="color:var(--text-muted);font-size:14px">No trends yet.</p>`;
+      return;
+    }
+    el.innerHTML = data.map(t => `
+      <div class="trend-item" onclick="window.location.href='index.html?q=%23${t.tag}'">
+        <div class="trend-tag">#${t.tag}</div>
+        <div class="trend-count">${t.count} tweet${t.count !== 1 ? "s" : ""}</div>
+      </div>`).join("");
+  }
+
+  // --- Suggestions --------------------
+  async function loadSuggestions() {
+    const [, data] = await apiSuggestions();
+    const el = document.getElementById("suggestionsList");
+    if (!Array.isArray(data) || !data.length) {
+      el.innerHTML = `<p style="color:var(--text-muted);font-size:14px">No suggestions.</p>`;
+      return;
+    }
+    el.innerHTML = data.map(u => `
+      <div class="suggestion-item">
+        <div class="avatar" style="width:42px;height:42px"
+             onclick="window.location.href='profile.html?u=${u.username}'">
+          ${(u.display_name || u.username)[0].toUpperCase()}
+        </div>
+        <div class="suggestion-info"
+             onclick="window.location.href='profile.html?u=${u.username}'"
+             style="cursor:pointer">
+          <div class="suggestion-name">${u.display_name || u.username}</div>
+          <div class="suggestion-handle">@${u.username}</div>
+        </div>
+        <button class="follow-btn" onclick="quickFollow('${u.username}', this)">Follow</button>
+      </div>`).join("");
+  }
+
+  async function quickFollow(username, btn) {
+    const [, data] = await apiFollow(username);
+    btn.textContent = data.following ? "Following" : "Follow";
+    btn.classList.toggle("following", data.following);
+  }
+
+  // --- Auth ----====-----
+  function logout() {
+    clearAuth();
+    if (ws) ws.close();
+    window.location.href = "login.html";
+  }
+
+  // --- WebSocket ----====
+  connectWS((msg) => {
+    if (msg.type === "new_tweet") {
+      apiGetTweet(msg.tweet_id).then(([, tweet]) => {
+        if (currentTab === "for") {
+          document.getElementById("feedList")
+            .insertAdjacentHTML("afterbegin", tweetCardHTML(tweet));
+        }
+      });
+    }
+    if (msg.type === "notification") {
+      showToast(`${msg.actor} ${msg.kind === "like" ? "liked your tweet" :
+                               msg.kind === "follow" ? "followed you" :
+                               "retweeted your tweet"}`);
+      // Refresh unread badge
+      apiUnreadCount().then(([, d]) => renderSidebar(d.unread || 0));
+    }
+  });
+
+  // --- Init ----====-----
+  async function init() {
+    const [, d] = await apiUnreadCount();
+    renderSidebar(d?.unread || 0);
+
+    // Show compose if logged in
+    document.getElementById("composeBox").style.display = "flex";
+    document.getElementById("composeAvatar").innerHTML  =
+      `<div class="avatar" style="width:42px;height:42px">
+         ${(user.display_name || user.username)[0].toUpperCase()}
+       </div>`;
+
+    loadFeed();
+    loadTrends();
+    loadSuggestions();
+  }
+
+  init();
+</script>
+</body>
+</html>

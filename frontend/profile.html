@@ -1,0 +1,486 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nexus — Profile</title>
+  <link rel="stylesheet" href="static/css/main.css"/>
+  <style>
+    .profile-banner {
+      height: 200px;
+      background: linear-gradient(135deg, #1d9bf0 0%, #0d47a1 100%);
+    }
+
+    [data-theme="light"] .profile-banner {
+      background: linear-gradient(135deg, #90caf9 0%, #1d9bf0 100%);
+    }
+
+    .profile-header {
+      padding: 0 20px 16px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .profile-avatar-wrap {
+      margin-top: -52px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .profile-big-avatar {
+      width: 104px;
+      height: 104px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-size: 40px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 4px solid var(--bg);
+    }
+
+    .profile-name {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+
+    .profile-handle {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .profile-bio {
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+
+    .profile-meta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 14px;
+    }
+
+    .profile-stats {
+      display: flex;
+      gap: 20px;
+      font-size: 15px;
+    }
+
+    .profile-stat {
+      cursor: pointer;
+      transition: text-decoration var(--transition);
+    }
+
+    .profile-stat:hover { text-decoration: underline; }
+    .profile-stat strong { font-weight: 800; }
+    .profile-stat span   { color: var(--text-muted); }
+
+    .profile-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .profile-tab {
+      flex: 1;
+      padding: 16px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all var(--transition);
+    }
+
+    .profile-tab:hover  { background: var(--bg-2); color: var(--text); }
+    .profile-tab.active { color: var(--text); border-bottom-color: var(--blue); }
+
+    /* Followers modal */
+    .user-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+
+    .user-row:hover { background: var(--bg-2); }
+
+    .user-row-info { flex: 1; min-width: 0; }
+
+    .user-row-name {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .user-row-handle {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .user-row-bio {
+      font-size: 14px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Left Sidebar -->
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <!-- Main -->
+  <main class="main-feed">
+    <div class="feed-header">
+      <button onclick="history.back()"
+              style="background:none;border:none;color:var(--text);
+                     font-size:20px;cursor:pointer;margin-right:16px">←</button>
+      <div>
+        <div id="headerName" style="font-size:18px;font-weight:800;line-height:1.2"></div>
+        <div id="headerTweets" style="font-size:13px;color:var(--text-muted)"></div>
+      </div>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"
+              style="margin-left:auto">☀️</button>
+    </div>
+
+    <div id="profileLoader" class="loader"><div class="spinner"></div></div>
+
+    <div id="profilePage" style="display:none">
+      <!-- Banner -->
+      <div class="profile-banner"></div>
+
+      <!-- Header -->
+      <div class="profile-header">
+        <div class="profile-avatar-wrap">
+          <div class="profile-big-avatar" id="bigAvatar"></div>
+          <div id="followBtnWrap"></div>
+        </div>
+
+        <div class="profile-name"   id="profileName"></div>
+        <div class="profile-handle" id="profileHandle"></div>
+        <div class="profile-bio"    id="profileBio"></div>
+
+        <div class="profile-meta">
+          <span id="profileJoined">📅 Joined Nexus</span>
+        </div>
+
+        <div class="profile-stats">
+          <div class="profile-stat" onclick="showUsersModal('following')">
+            <strong id="statFollowing">0</strong>
+            <span> Following</span>
+          </div>
+          <div class="profile-stat" onclick="showUsersModal('followers')">
+            <strong id="statFollowers">0</strong>
+            <span> Followers</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="profile-tabs">
+        <button class="profile-tab active"
+                onclick="switchTab('tweets', this)">Tweets</button>
+        <button class="profile-tab"
+                onclick="switchTab('replies', this)">Replies</button>
+        <button class="profile-tab"
+                onclick="switchTab('likes', this)">Likes</button>
+      </div>
+
+      <!-- Content -->
+      <div id="profileContent"></div>
+      <div id="contentLoader" class="loader" style="display:none">
+        <div class="spinner"></div>
+      </div>
+      <div id="contentEmpty" class="empty" style="display:none">
+        <div class="empty-icon">🕊</div>
+        <h3>Nothing here</h3>
+        <p>No content yet.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right Sidebar -->
+  <aside class="right-sidebar">
+    <div class="search-bar">
+      <span>🔍</span>
+      <input type="text" placeholder="Search Nexus"
+             onkeydown="if(event.key==='Enter') window.location.href=
+               'index.html?q='+encodeURIComponent(this.value)"/>
+    </div>
+  </aside>
+</div>
+
+<!-- Followers/Following Modal -->
+<div class="modal-overlay" id="usersModal"
+     style="display:none" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-close" onclick="closeUsersModal()">✕</button>
+      <span id="modalTitle">Followers</span>
+    </div>
+    <div id="modalList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="static/js/api.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.href = "login.html";
+
+  initTheme();
+
+  const params   = new URLSearchParams(window.location.search);
+  const username = params.get("u");
+  const me       = getUser();
+  let profileData = {};
+  let currentTab  = "tweets";
+
+  if (!username) window.location.href = "index.html";
+
+  // --- Sidebar ----====-
+  document.getElementById("sidebar").innerHTML = `
+    <div class="sidebar-logo">𝕏 <span>Nexus</span></div>
+    <button class="nav-item" onclick="window.location.href='index.html'">
+      🏠 <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-item" onclick="window.location.href='index.html'">
+      🔍 <span class="nav-label">Explore</span>
+    </button>
+    <button class="nav-item"
+            onclick="window.location.href='profile.html?u=${me.username}'">
+      👤 <span class="nav-label">Profile</span>
+    </button>
+    <button class="tweet-btn" onclick="window.location.href='index.html'">
+      <span>Post</span>
+    </button>
+    <div class="sidebar-user">
+      <div class="avatar" style="width:40px;height:40px">
+        ${(me.display_name || me.username)[0].toUpperCase()}
+      </div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name">${me.display_name || me.username}</div>
+        <div class="sidebar-user-handle">@${me.username}</div>
+      </div>
+      <button onclick="logout()"
+              style="background:none;border:none;color:var(--text-muted);
+                     cursor:pointer;font-size:18px">···</button>
+    </div>`;
+
+  // --- Load profile --------------------
+  async function loadProfile() {
+    const [status, data] = await apiGetProfile(username);
+
+    if (status !== 200) {
+      showToast("Profile not found.", "error");
+      setTimeout(() => window.location.href = "index.html", 1500);
+      return;
+    }
+
+    profileData = data;
+    document.title = `${data.display_name || data.username} (@${data.username}) — Nexus`;
+
+    // Header
+    document.getElementById("headerName").textContent =
+      data.display_name || data.username;
+    document.getElementById("headerTweets").textContent =
+      `${data.tweet_count} tweet${data.tweet_count !== 1 ? "s" : ""}`;
+
+    // Avatar
+    document.getElementById("bigAvatar").textContent =
+      (data.display_name || data.username)[0].toUpperCase();
+
+    // Name + handle + bio
+    document.getElementById("profileName").textContent =
+      data.display_name || data.username;
+    document.getElementById("profileHandle").textContent =
+      `@${data.username}`;
+    document.getElementById("profileBio").textContent =
+      data.bio || "";
+    document.getElementById("profileJoined").textContent =
+      `📅 Joined ${new Date(data.joined).toLocaleDateString("en-ZA",
+        { month: "long", year: "numeric" })}`;
+
+    // Stats
+    document.getElementById("statFollowing").textContent =
+      data.following_count.toLocaleString();
+    document.getElementById("statFollowers").textContent =
+      data.follower_count.toLocaleString();
+
+    // Follow / Edit button
+    const btnWrap = document.getElementById("followBtnWrap");
+
+    if (me.username === username) {
+      btnWrap.innerHTML = `
+        <button class="btn btn-outline" onclick="showEditModal()">
+          Edit profile
+        </button>`;
+    } else {
+      btnWrap.innerHTML = `
+        <button class="follow-btn ${data.is_following ? "following" : ""}"
+                id="followBtn" onclick="toggleFollow()">
+          ${data.is_following ? "Following" : "Follow"}
+        </button>`;
+    }
+
+    document.getElementById("profileLoader").style.display = "none";
+    document.getElementById("profilePage").style.display   = "block";
+
+    loadTabContent("tweets");
+  }
+
+  // --- Tab content ---------------------
+  function switchTab(tab, el) {
+    currentTab = tab;
+    document.querySelectorAll(".profile-tab")
+      .forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    loadTabContent(tab);
+  }
+
+  async function loadTabContent(tab) {
+    document.getElementById("profileContent").innerHTML  = "";
+    document.getElementById("contentLoader").style.display = "flex";
+    document.getElementById("contentEmpty").style.display  = "none";
+
+    let tweets = [];
+
+    if (tab === "tweets") {
+      const [, data] = await apiGetUserTweets(username);
+      tweets = Array.isArray(data) ? data : [];
+    } else if (tab === "replies") {
+      const [, data] = await apiGetUserReplies(username);
+      tweets = Array.isArray(data) ? data : [];
+    } else if (tab === "likes") {
+      const [, data] = await apiGetUserLikes(username);
+      tweets = Array.isArray(data) ? data : [];
+    }
+
+    document.getElementById("contentLoader").style.display = "none";
+
+    if (!tweets.length) {
+      document.getElementById("contentEmpty").style.display = "block";
+      const msgs = {
+        tweets:  ["No tweets yet", `@${username} hasn't tweeted yet.`],
+        replies: ["No replies yet", `@${username} hasn't replied to anyone.`],
+        likes:   ["No likes yet",   `@${username} hasn't liked any tweets.`],
+      };
+      document.querySelector("#contentEmpty h3").textContent = msgs[tab][0];
+      document.querySelector("#contentEmpty p").textContent  = msgs[tab][1];
+      return;
+    }
+
+    document.getElementById("profileContent").innerHTML =
+      tweets.map(t => tweetCardHTML(t)).join("");
+  }
+
+  // --- Follow ----====----
+  async function toggleFollow() {
+    const [, data] = await apiFollow(username);
+    const btn = document.getElementById("followBtn");
+    if (!btn) return;
+
+    btn.textContent = data.following ? "Following" : "Follow";
+    btn.classList.toggle("following", data.following);
+
+    document.getElementById("statFollowers").textContent =
+      data.follower_count.toLocaleString();
+
+    showToast(data.message);
+  }
+
+  // --- Followers / Following modal ---->
+  async function showUsersModal(type) {
+    document.getElementById("modalTitle").textContent =
+      type === "followers" ? "Followers" : "Following";
+    document.getElementById("modalList").innerHTML =
+      `<div class="loader"><div class="spinner"></div></div>`;
+    document.getElementById("usersModal").style.display = "flex";
+
+    const [, data] = type === "followers"
+      ? await apiGetFollowers(username)
+      : await apiGetFollowing(username);
+
+    if (!Array.isArray(data) || !data.length) {
+      document.getElementById("modalList").innerHTML =
+        `<div class="empty"><div class="empty-icon">👤</div>
+         <p>No ${type} yet.</p></div>`;
+      return;
+    }
+
+    document.getElementById("modalList").innerHTML = data.map(u => `
+      <div class="user-row"
+           onclick="closeUsersModal();
+                    window.location.href='profile.html?u=${u.username}'">
+        <div class="avatar" style="width:48px;height:48px">
+          ${(u.display_name || u.username)[0].toUpperCase()}
+        </div>
+        <div class="user-row-info">
+          <div class="user-row-name">${u.display_name || u.username}</div>
+          <div class="user-row-handle">@${u.username}</div>
+          ${u.bio ? `<div class="user-row-bio">${u.bio}</div>` : ""}
+        </div>
+        ${u.username !== me.username ? `
+          <button class="follow-btn ${u.is_following ? "following" : ""}"
+                  onclick="event.stopPropagation();quickFollow('${u.username}', this)">
+            ${u.is_following ? "Following" : "Follow"}
+          </button>` : ""}
+      </div>`).join("");
+  }
+
+  function closeUsersModal() {
+    document.getElementById("usersModal").style.display = "none";
+  }
+
+  function closeModal(e) {
+    if (e.target.id === "usersModal") closeUsersModal();
+  }
+
+  async function quickFollow(username, btn) {
+    const [, data] = await apiFollow(username);
+    btn.textContent = data.following ? "Following" : "Follow";
+    btn.classList.toggle("following", data.following);
+  }
+
+  // --- Edit profile stub ---------------
+  function showEditModal() {
+    showToast("Edit profile coming soon!");
+  }
+
+  // --- Auth ----====-----
+  function logout() {
+    clearAuth();
+    window.location.href = "login.html";
+  }
+
+  // --- Missing api helper — get user replies ---------------------
+  async function apiGetUserReplies(username) {
+    const r = await fetch(`${API}/users/${username}/replies`, {
+      headers: authHeaders()
+    });
+    return [r.status, await r.json()];
+  }
+
+  loadProfile();
+</script>
+</body>
+</html>
